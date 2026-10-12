@@ -17,6 +17,18 @@
 <canvas id="live" class="layer"></canvas>
 <p id="empty-hint">Raise your index finger to draw</p>
 
+<div id="text-edit" data-ui hidden>
+  <textarea id="text-input" rows="1" wrap="off" spellcheck="false" autocomplete="off" aria-label="Text on the board"></textarea>
+  <div class="text-edit-bar">
+    <button class="chip" data-act="text-done" title="Add the text (Enter)">Done</button>
+    <button class="chip" data-act="text-cancel" title="Discard changes (Esc)">Cancel</button>
+  </div>
+</div>
+
+<div id="sel-bar" data-ui hidden>
+  <button class="chip" data-act="sel-delete" data-dwell="1000" title="Delete the selected item (Backspace)">Delete</button>
+</div>
+
 <div id="status" class="panel" data-ui data-state="idle" hidden>
   <div class="status-row"><span class="dot"></span><span id="status-title">Starting</span></div>
   <div id="status-hint" class="status-hint"></div>
@@ -33,13 +45,14 @@
 <div id="actions" class="dock" data-ui aria-label="Board actions"></div>
 
 <aside id="cam" class="panel collapsed" data-ui aria-label="Camera preview">
+  <div class="cam-bar" title="Drag to move. With your hand, pinch to grab it.">
+    <span class="cam-title"><span class="cam-handle" aria-hidden="true"></span><span class="eyebrow">Camera</span></span>
+    <div class="cam-actions" id="cam-actions"></div>
+  </div>
   <div class="cam-view" id="cam-view">
     <video id="video" playsinline muted autoplay></video>
     <canvas id="cam-overlay"></canvas>
-  </div>
-  <div class="cam-bar">
-    <span class="eyebrow">Camera</span>
-    <div class="cam-actions" id="cam-actions"></div>
+    <span class="cam-grip" title="Drag to resize. With your hand, pinch to grab it." aria-hidden="true"></span>
   </div>
 </aside>
 

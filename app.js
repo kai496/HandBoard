@@ -26,14 +26,16 @@ const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const TOOLS = [
+  { id: "select",    label: "Select",    kind: "select", key: "s", widths: [3, 6, 11, 20] },
   { id: "brush",     label: "Brush",     kind: "stroke", key: "b", widths: [3, 6, 11, 20] },
   { id: "highlight", label: "Highlight", kind: "stroke", key: "h", widths: [12, 20, 30, 46] },
   { id: "eraser",    label: "Eraser",    kind: "erase",  key: "e", widths: [16, 30, 56, 96] },
+  { id: "text",      label: "Text",      kind: "text",   key: "t", widths: [20, 28, 40, 60] },   // font sizes
   { id: "line",      label: "Line",      kind: "shape",  key: "l", widths: [3, 5, 9, 15] },
   { id: "arrow",     label: "Arrow",     kind: "shape",  key: "a", widths: [3, 5, 9, 15] },
   { id: "rect",      label: "Box",       kind: "shape",  key: "r", widths: [3, 5, 9, 15] },
   { id: "circle",    label: "Circle",    kind: "shape",  key: "c", widths: [3, 5, 9, 15] },
-  { id: "triangle",  label: "Triangle",  kind: "shape",  key: "t", widths: [3, 5, 9, 15] },
+  { id: "triangle",  label: "Triangle",  kind: "shape",  key: "y", widths: [3, 5, 9, 15] },
 ];
 const TOOL = Object.fromEntries(TOOLS.map(t => [t.id, t]));
 
@@ -49,6 +51,7 @@ const COLORS = [
 const SIZE_DOTS = [5, 9, 14, 21];
 
 const ICONS = {
+  select: '<path d="M6 3.5v15.5l4-4 3 6.2 2.6-1.2-3-6.1H18z"/>',
   brush: '<path d="M4 20l1.1-4.4L16.2 4.5a2.1 2.1 0 013 0l.3.3a2.1 2.1 0 010 3L8.4 18.9z"/><path d="M14.5 6.2l3.3 3.3"/>',
   highlight: '<path d="M14 4l6 6-8.5 8.5H7.5v-4z"/><path d="M7.5 18.5L4.5 21.5"/><path d="M11 7l6 6"/>',
   eraser: '<path d="M4.6 17.4a2 2 0 010-2.8l9.2-9.2a2 2 0 012.8 0l3 3a2 2 0 010 2.8L11 19.8H8.6a2 2 0 01-1.4-.6z"/><path d="M9.5 9.5l5 5"/><path d="M14 20h6"/>',
@@ -57,12 +60,15 @@ const ICONS = {
   rect: '<rect x="4" y="6" width="16" height="12" rx="1.5"/>',
   circle: '<circle cx="12" cy="12" r="8"/>',
   triangle: '<path d="M12 4.5l8 14H4z"/>',
+  text: '<path d="M5 7V5h14v2"/><path d="M12 5v14"/><path d="M9 19h6"/>',
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/>',
   redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 000 11H13"/>',
   clear: '<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12"/><path d="M9 7V4.5h6V7"/>',
   board: '<rect x="3.5" y="4.5" width="17" height="13" rx="1.5"/><path d="M12 4.5h7a1.5 1.5 0 011.5 1.5v10a1.5 1.5 0 01-1.5 1.5h-7z" fill="currentColor"/><path d="M8.5 21h7M12 17.5V21"/>',
   save: '<path d="M12 4v11"/><path d="M7 10.5l5 5 5-5"/><path d="M5 20h14"/>',
   camera: '<rect x="3" y="6.5" width="13" height="11" rx="2"/><path d="M16 10.5l5-3v9l-5-3z"/>',
+  cameraOff: '<path d="M8.5 6.5H14a2 2 0 012 2v3.5m0 4V15.5a2 2 0 01-2 2H5a2 2 0 01-2-2v-7a2 2 0 011.2-1.8"/><path d="M16 10.5l5-3v9l-3.3-2"/><path d="M3 3l18 18"/>',
+  preview: '<rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="6.5" height="5.5" rx="1" fill="currentColor"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 114 2.1c-.9.6-1.6 1.1-1.6 2.3"/><circle cx="12" cy="17.2" r=".7" fill="currentColor"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
   eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
@@ -94,6 +100,8 @@ const state = {
   maxHands: saved.maxHands === 1 ? 1 : 2,
   ghost: !!saved.ghost,
   camVisible: saved.camVisible !== false,
+  camBox: saved.camBox && ["x", "y", "w"].every(k => Number.isFinite(saved.camBox[k])) ? saved.camBox : null,   // preview position + width
+  camOn: false,             // webcam is capturing
   mode: "intro",            // intro | camera | mouse
   view: "board",            // board | practice
   items: [],
@@ -101,7 +109,7 @@ const state = {
 };
 {
   const items = store.get("items", []);
-  if (Array.isArray(items)) state.items = items.filter(it => it && ["stroke", "shape", "clear"].includes(it.type));
+  if (Array.isArray(items)) state.items = items.filter(it => it && ["stroke", "shape", "text", "clear", "move", "remove"].includes(it.type));
 }
 
 /* ---------- Elements ---------- */
@@ -110,6 +118,7 @@ const el = {
   video: $("#video"), camView: $("#cam-view"), camOverlay: $("#cam-overlay"), cam: $("#cam"),
   status: $("#status"), statusTitle: $("#status-title"), statusHint: $("#status-hint"),
   hint: $("#empty-hint"), toast: $("#toast"), intro: $("#intro"), help: $("#help"),
+  textEdit: $("#text-edit"), textInput: $("#text-input"), selBar: $("#sel-bar"),
   tools: $("#tools"), swatches: $("#swatches"), sizes: $("#sizes"), actions: $("#actions"),
   practice: $("#practice"), pCanvas: $("#p-canvas"), pStage: $("#p-stage"), pHud: $("#p-hud"), pEyebrow: $("#p-eyebrow"),
   pTrack: $("#p-track"), pTrackText: $("#p-track-text"), pSkip: $("#p-skip"), pMenuBtn: $("#p-menu-btn"), pHint: $("#p-hint"),
@@ -129,7 +138,7 @@ let theme = {};
 
 /* ---------- Build the chrome ---------- */
 function buildUI() {
-  const groups = [["brush", "highlight", "eraser"], ["line", "arrow", "rect", "circle", "triangle"]];
+  const groups = [["select"], ["brush", "highlight", "eraser", "text"], ["line", "arrow", "rect", "circle", "triangle"]];
   el.tools.innerHTML = groups.map(g => g.map(id => {
     const t = TOOL[id];
     return `<button class="btn" data-act="tool" data-arg="${id}" aria-pressed="false" aria-label="${t.label}" title="${t.label} (${t.key.toUpperCase()})">${svg(id)}<span class="lbl">${t.label}</span></button>`;
@@ -150,7 +159,8 @@ function buildUI() {
     '<span class="sep" aria-hidden="true"></span>',
     act("board", "board", "Board", "Switch board (W)"),
     act("save", "save", "Save", "Save as PNG (⌘S)"),
-    act("cam", "camera", "Camera", "Show or hide the camera preview (V)", 'aria-pressed="false"'),
+    act("camera", "camera", "Camera", "Turn the camera on or off", 'aria-pressed="false"'),
+    act("cam", "preview", "Preview", "Show or hide the camera preview (V)", 'aria-pressed="false"'),
     act("practice", "practice", "Practice", "Hand practice games (P)"),
     act("help", "help", "Help", "Gestures and settings (?)"),
   ].join("");
@@ -161,8 +171,10 @@ function buildUI() {
 
   $("[data-act=help-close]").innerHTML = svg("close");
 
-  const keys = [["B", "Brush"], ["H", "Highlight"], ["E", "Eraser"], ["L", "Line"], ["A", "Arrow"], ["R", "Box"],
-    ["C", "Circle"], ["T", "Triangle"], ["1–4", "Size"], ["⌘Z", "Undo"], ["⇧⌘Z", "Redo"], ["W", "Switch board"],
+  $("[data-act=sel-delete]").innerHTML = `${svg("clear")}Delete`;
+
+  const keys = [["S", "Select and move"], ["⌫", "Delete selected"], ["B", "Brush"], ["H", "Highlight"], ["E", "Eraser"], ["L", "Line"], ["A", "Arrow"], ["R", "Box"],
+    ["C", "Circle"], ["Y", "Triangle"], ["T", "Text"], ["1–4", "Size"], ["⌘Z", "Undo"], ["⇧⌘Z", "Redo"], ["W", "Switch board"],
     ["G", "Camera on board"], ["V", "Camera preview"], ["⌘S", "Save PNG"], ["P", "Practice games"], ["?", "This panel"]];
   $("#keys").innerHTML = keys.map(([k, d]) => `<div><dt><kbd>${k}</kbd></dt><dd>${d}</dd></div>`).join("");
 }
@@ -229,7 +241,9 @@ function refreshTheme() {
   theme = { accent: v("--accent"), fg: v("--fg"), board: v("--board"), live: v("--live"), danger: v("--danger") };
 }
 const toolWidth = (tool = TOOL[state.tool]) => tool.widths[state.sizeIdx];
-const camReady = () => !!landmarker;
+const camReady = () => !!landmarker && state.camOn;
+// Drawing with the mouse only: mouse mode, or the camera has been switched off.
+const mouseOnly = () => state.mode === "mouse" || (state.mode === "camera" && !!landmarker && !state.camOn && !camStarting);
 
 function syncUI() {
   document.documentElement.dataset.board = state.board;
@@ -249,25 +263,35 @@ function syncUI() {
     b.firstElementChild.classList.toggle("hollow", erasing);
   }
   $("[data-act=board]").title = state.board === "black" ? "Switch to whiteboard (W)" : "Switch to blackboard (W)";
-  $("#actions [data-act=cam]").setAttribute("aria-pressed", state.camVisible && camReady());
+  const camBtn = $("#actions [data-act=camera]"), previewBtn = $("#actions [data-act=cam]");
+  camBtn.setAttribute("aria-pressed", state.camOn);
+  camBtn.querySelector("svg").innerHTML = ICONS[state.camOn ? "camera" : "cameraOff"];
+  camBtn.title = state.camOn ? "Turn the camera off (stops capturing)" : "Turn the camera on";
+  previewBtn.setAttribute("aria-pressed", state.camVisible && camReady());
+  previewBtn.disabled = !camReady();
   $("[data-act=ghost]").setAttribute("aria-pressed", state.ghost);
   for (const b of document.querySelectorAll("[data-act=draw-with]")) b.setAttribute("aria-pressed", b.dataset.arg === state.drawWith);
   for (const b of document.querySelectorAll("[data-act=hands]")) b.setAttribute("aria-pressed", Number(b.dataset.arg) === state.maxHands);
   el.cam.classList.toggle("collapsed", !(camReady() && state.camVisible));
+  placeCam();
   el.ghost.hidden = !(state.ghost && camReady());
   renderGuides();
+  if (textEdit.open) styleEditor();
   syncDoc();
   statusKey = "";
+  saveSettings();
+}
+function saveSettings() {
   store.set("settings", {
-    tool: state.tool, color: state.color, sizeIdx: state.sizeIdx, board: state.board,
-    drawWith: state.drawWith, maxHands: state.maxHands, ghost: state.ghost, camVisible: state.camVisible,
+    tool: state.tool, color: state.color, sizeIdx: state.sizeIdx, board: state.board, drawWith: state.drawWith,
+    maxHands: state.maxHands, ghost: state.ghost, camVisible: state.camVisible, camBox: state.camBox,
   });
 }
 
 function syncDoc() {
   $("[data-act=undo]").disabled = !state.items.length;
   $("[data-act=redo]").disabled = !state.redo.length;
-  el.hint.textContent = state.mode === "mouse" ? "Drag anywhere to draw"
+  el.hint.textContent = mouseOnly() ? "Drag anywhere to draw"
     : state.drawWith === "pinch" ? "Pinch to draw" : "Raise your index finger to draw";
   el.hint.hidden = hasInk();
 }
@@ -310,20 +334,22 @@ function traceShape(c, shape, a, b, w) {
     case "circle":
       c.arc((ax + bx) / 2, (ay + by) / 2, Math.hypot(bx - ax, by - ay) / 2, 0, TAU); break;
     case "triangle": {
-      const cx = (ax + bx) / 2, cy = (ay + by) / 2, r = Math.hypot(bx - ax, by - ay) / 2;
-      for (let k = 0; k < 3; k++) {
-        const t = -Math.PI / 2 + k * TAU / 3;
-        const x = cx + r * Math.cos(t), y = cy + r * Math.sin(t);
-        k ? c.lineTo(x, y) : c.moveTo(x, y);
-      }
+      const [p0, p1, p2] = trianglePts(a, b);
+      c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); c.lineTo(p2[0], p2[1]);
       c.closePath();
       break;
     }
   }
   c.stroke();
 }
+// An upright equilateral triangle inside the circle whose diameter is a–b.
+function trianglePts([ax, ay], [bx, by]) {
+  const cx = (ax + bx) / 2, cy = (ay + by) / 2, r = Math.hypot(bx - ax, by - ay) / 2;
+  return [0, 1, 2].map(k => { const t = -Math.PI / 2 + k * TAU / 3; return [cx + r * Math.cos(t), cy + r * Math.sin(t)]; });
+}
 
 function drawItem(c, it) {
+  if (it.type === "move" || it.type === "remove") return;   // history entries, nothing to draw
   if (it.type === "clear") {
     c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); c.restore();
     return;
@@ -345,6 +371,8 @@ function drawItem(c, it) {
     const p = it.p;
     if (p.length === 1) { c.beginPath(); c.arc(p[0][0], p[0][1], it.w / 2, 0, TAU); c.fill(); }
     else { tracePath(c, p); c.stroke(); }
+  } else if (it.type === "text") {
+    drawText(c, it);
   } else {
     traceShape(c, it.shape, it.a, it.b, it.w);
   }
@@ -352,8 +380,16 @@ function drawItem(c, it) {
 }
 
 function renderAll() {
-  ctx.ink.clearRect(0, 0, W, H);
-  for (let i = lastClear() + 1; i < state.items.length; i++) drawItem(ctx.ink, state.items[i]);
+  const c = ctx.ink;
+  c.clearRect(0, 0, W, H);
+  const hidden = hiddenIds(), off = offsets();
+  for (let i = lastClear() + 1; i < state.items.length; i++) {
+    const it = state.items[i];
+    if (it.id && hidden.has(it.id)) continue;
+    const o = it.id && off.get(it.id);
+    if (o) { c.save(); c.translate(o[0], o[1]); drawItem(c, it); c.restore(); }
+    else drawItem(c, it);
+  }
 }
 
 let saveTimer;
@@ -366,23 +402,31 @@ function afterChange() {
 function commit(item) {
   state.items.push(item);
   state.redo.length = 0;
-  drawItem(ctx.ink, item);
+  // Edits, moves and deletes change something already on the board, so redraw it all.
+  if (item.edits || item.type === "move" || item.type === "remove") renderAll();
+  else drawItem(ctx.ink, item);
   afterChange();
 }
 
 function undo() {
+  textCommit();
+  dropSelection();
   const it = state.items.pop();
   if (!it) return;
   state.redo.push(it);
   renderAll(); afterChange();
 }
 function redo() {
+  textCommit();
+  dropSelection();
   const it = state.redo.pop();
   if (!it) return;
   state.items.push(it);
   renderAll(); afterChange();
 }
 function clearBoard() {
+  textCommit();
+  dropSelection();
   if (!hasInk()) { toast("The board is already clear"); return; }
   commit({ type: "clear" });
   toast("Board cleared. Undo brings it back.");
@@ -391,7 +435,7 @@ function clearBoard() {
 /* ---------- Strokes ---------- */
 function beginStroke(s, x, y) {
   const tool = TOOL[state.tool];
-  s.stroke = { type: "stroke", tool: tool.id, c: state.color, w: toolWidth(tool), p: [[r1(x), r1(y)]] };
+  s.stroke = { type: "stroke", id: newId(), tool: tool.id, c: state.color, w: toolWidth(tool), p: [[r1(x), r1(y)]] };
   if (tool.id === "eraser") {
     const c = ctx.ink;
     c.save(); c.globalCompositeOperation = "destination-out";
@@ -418,16 +462,244 @@ function endStroke(s, trim = 0) {
   commit(st);
 }
 function makeShape(tool, a, b) {
-  return { type: "shape", shape: tool.id, c: state.color, w: toolWidth(tool), a: [r1(a[0]), r1(a[1])], b: [r1(b[0]), r1(b[1])] };
+  return { type: "shape", id: newId(), shape: tool.id, c: state.color, w: toolWidth(tool), a: [r1(a[0]), r1(a[1])], b: [r1(b[0]), r1(b[1])] };
 }
 // Also makes each hand lift its finger before it draws again, so switching
 // tools while pointing doesn't start a mark straight away.
 function endAllStrokes() {
+  textCommit();
+  dropSelection();
   for (const s of allSources()) {
     endStroke(s, 0);
     s.shape = null; s.stamp = null; s.anchor = null; s.drawing = false;
     if (s.kind === "hand" && s.visible) s.needsFresh = true;
   }
+}
+
+/* ---------- Text ---------- */
+const TEXT_LINE = 1.25;                       // line height, as a multiple of the font size
+const TEXT_PAD = [4, 6], TEXT_BORDER = 1.5;   // editor padding (top/bottom, sides) and border, px
+const textFont = size => `700 ${size}px Kalam, "Segoe Print", "Bradley Hand", cursive`;
+const textSize = () => TOOL.text.widths[state.sizeIdx];
+const newId = () => Math.random().toString(36).slice(2, 10);
+const measure = document.createElement("canvas").getContext("2d");
+const textEdit = { open: false, x: 0, y: 0, edits: null };
+
+// Where the first baseline sits in a line, worked out the way CSS lays out the
+// editor, so text doesn't jump when it's committed to the board.
+function baselineOffset(c, size) {
+  const m = c.measureText("Hg"), asc = m.fontBoundingBoxAscent, desc = m.fontBoundingBoxDescent;
+  const lh = size * TEXT_LINE;
+  return asc != null && desc != null ? (lh - asc - desc) / 2 + asc : lh * 0.78;
+}
+function drawText(c, it) {
+  if (!it.t) return;
+  c.font = textFont(it.s);
+  c.textBaseline = "alphabetic";
+  const lh = it.s * TEXT_LINE, base = baselineOffset(c, it.s);
+  it.t.split("\n").forEach((line, i) => c.fillText(line, it.x, it.y + i * lh + base));
+}
+function textBounds(it) {
+  measure.font = textFont(it.s);
+  const lines = it.t.split("\n");
+  return { x: it.x, y: it.y, w: Math.max(...lines.map(l => measure.measureText(l).width)), h: lines.length * it.s * TEXT_LINE };
+}
+// A click (or a point from the hand) with the Text tool: finish the open text,
+// edit the text under the cursor, or start a new one.
+function textClick(x, y) {
+  if (textEdit.open) { textCommit(); return; }
+  const hit = itemAt(x, y, it => it.type === "text");
+  textEdit.open = true;
+  if (hit) {
+    const { it } = hit;
+    Object.assign(textEdit, { x: it.x + hit.dx, y: it.y + hit.dy, edits: it.id });   // where it is now, after any moves
+    state.color = it.c;
+    const i = TOOL.text.widths.indexOf(it.s);
+    if (i >= 0) state.sizeIdx = i;
+    el.textInput.value = it.t;
+    renderAll();
+  } else {
+    Object.assign(textEdit, { x, y: y - textSize() * TEXT_LINE / 2, edits: null });
+    el.textInput.value = "";
+  }
+  el.textEdit.hidden = false;
+  syncUI();
+  keepTyping();
+}
+function styleEditor() {
+  const size = textSize(), ta = el.textInput;
+  ta.style.font = textFont(size);
+  ta.style.lineHeight = String(TEXT_LINE);
+  ta.style.color = colorOf(state.color);
+  measure.font = textFont(size);
+  const lines = ta.value.split("\n");
+  const w = Math.max(size * 2, ...lines.map(l => measure.measureText(l).width));
+  ta.style.width = `${Math.ceil(w + size * 0.6 + 2 * (TEXT_PAD[1] + TEXT_BORDER))}px`;
+  ta.style.height = `${Math.ceil(lines.length * size * TEXT_LINE + 2 * (TEXT_PAD[0] + TEXT_BORDER)) + 1}px`;
+  el.textEdit.style.left = `${textEdit.x - TEXT_PAD[1] - TEXT_BORDER}px`;
+  el.textEdit.style.top = `${textEdit.y - TEXT_PAD[0] - TEXT_BORDER}px`;
+}
+function keepTyping() {
+  if (!textEdit.open) return;
+  el.textInput.focus({ preventScroll: true });
+  // A click on the board can take focus back after this runs.
+  requestAnimationFrame(() => { if (textEdit.open) el.textInput.focus({ preventScroll: true }); });
+}
+function closeEditor() {
+  textEdit.open = false;
+  el.textEdit.hidden = true;
+  el.textInput.blur();
+}
+function textCommit() {
+  if (!textEdit.open) return;
+  const t = el.textInput.value.replace(/\s+$/, ""), { x, y, edits } = textEdit;
+  closeEditor();
+  const old = edits && state.items.find(it => it.id === edits);
+  const unchanged = old && old.t === t && old.c === state.color && old.s === textSize();
+  if ((!t && !edits) || unchanged) { if (edits) renderAll(); return; }
+  commit({ type: "text", id: newId(), x: r1(x), y: r1(y), t, c: state.color, s: textSize(), ...(edits && { edits }) });
+}
+function textCancel() {
+  if (!textEdit.open) return;
+  const edits = textEdit.edits;
+  closeEditor();
+  if (edits) renderAll();
+}
+el.textInput.addEventListener("input", styleEditor);
+
+/* ---------- Select: move and delete text, shapes and drawings ---------- */
+// Moves and deletes are history entries ({type:"move"|"remove", target}), so Undo reverses them.
+const sel = { id: null, drag: null };   // drag: { by: "mouse" | hand, sx, sy, dx, dy }
+const MOVABLE = new Set(["stroke", "shape", "text"]);
+const findItem = id => state.items.find(it => it.id === id);
+
+// Items not drawn: texts with a newer edited version, deleted items, the text open
+// in the editor, and the item being dragged (the live layer draws that one).
+function hiddenIds() {
+  const ids = new Set();
+  for (const it of state.items) {
+    if (it.edits) ids.add(it.edits);
+    if (it.type === "remove") ids.add(it.target);
+  }
+  if (textEdit.open && textEdit.edits) ids.add(textEdit.edits);
+  if (sel.drag) ids.add(sel.id);
+  return ids;
+}
+// How far each item has been moved in total.
+function offsets() {
+  const m = new Map();
+  for (const it of state.items) {
+    if (it.type !== "move") continue;
+    const o = m.get(it.target) || [0, 0];
+    m.set(it.target, [o[0] + it.dx, o[1] + it.dy]);
+  }
+  return m;
+}
+
+function segDist(px, py, [ax, ay], [bx, by]) {
+  const vx = bx - ax, vy = by - ay, len2 = vx * vx + vy * vy;
+  const t = len2 ? clamp(((px - ax) * vx + (py - ay) * vy) / len2, 0, 1) : 0;
+  return Math.hypot(px - ax - vx * t, py - ay - vy * t);
+}
+function polyDist(pts, x, y) {
+  let d = Infinity;
+  for (let i = 1; i < pts.length; i++) d = Math.min(d, segDist(x, y, pts[i - 1], pts[i]));
+  return d;
+}
+// Text is grabbed anywhere in its box; lines and outlines near the ink itself.
+function hitItem(it, x, y) {
+  if (it.type === "text") {
+    const b = textBounds(it);
+    return x >= b.x - 8 && x <= b.x + b.w + 8 && y >= b.y - 8 && y <= b.y + b.h + 8;
+  }
+  const tol = Math.max(14, it.w / 2 + 8);
+  if (it.type === "stroke") {
+    return it.p.length === 1 ? Math.hypot(x - it.p[0][0], y - it.p[0][1]) <= tol : polyDist(it.p, x, y) <= tol;
+  }
+  const [ax, ay] = it.a, [bx, by] = it.b;
+  switch (it.shape) {
+    case "circle": return Math.abs(Math.hypot(x - (ax + bx) / 2, y - (ay + by) / 2) - Math.hypot(bx - ax, by - ay) / 2) <= tol;
+    case "rect": return polyDist([[ax, ay], [bx, ay], [bx, by], [ax, by], [ax, ay]], x, y) <= tol;
+    case "triangle": { const t = trianglePts(it.a, it.b); return polyDist([...t, t[0]], x, y) <= tol; }
+    default: return segDist(x, y, it.a, it.b) <= tol;   // line, arrow
+  }
+}
+function itemBounds(it) {
+  if (it.type === "text") return textBounds(it);
+  const pad = it.w / 2 + (it.shape === "arrow" ? Math.max(14, it.w * 3.2) / 2 : 0) + 2;
+  let pts = it.type === "stroke" ? it.p : [it.a, it.b];
+  if (it.shape === "circle" || it.shape === "triangle") {
+    const cx = (it.a[0] + it.b[0]) / 2, cy = (it.a[1] + it.b[1]) / 2, r = dist(it.a, it.b) / 2;
+    pts = [[cx - r, cy - r], [cx + r, cy + r]];
+  }
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of pts) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  return { x: x0 - pad, y: y0 - pad, w: x1 - x0 + 2 * pad, h: y1 - y0 + 2 * pad };
+}
+// The topmost item under (x, y), with how far it has been moved.
+function itemAt(x, y, accept = () => true) {
+  const hidden = hiddenIds(), off = offsets();
+  for (let i = state.items.length - 1; i > lastClear(); i--) {
+    const it = state.items[i];
+    if (!MOVABLE.has(it.type) || !it.id || hidden.has(it.id) || it.tool === "eraser") continue;
+    if ((it.type === "text" && !it.t) || !accept(it)) continue;
+    const [dx, dy] = off.get(it.id) || [0, 0];
+    if (hitItem(it, x - dx, y - dy)) return { it, dx, dy };
+  }
+  return null;
+}
+
+function beginMove(by, x, y, hit) {
+  sel.id = hit.it.id;
+  sel.drag = { by, sx: x, sy: y, dx: 0, dy: 0 };
+  renderAll();   // lift it off the board while it moves
+}
+function updateMove(x, y) {
+  sel.drag.dx = x - sel.drag.sx;
+  sel.drag.dy = y - sel.drag.sy;
+}
+function endMove() {
+  const d = sel.drag;
+  if (!d) return;
+  sel.drag = null;
+  if (Math.hypot(d.dx, d.dy) >= 1) commit({ type: "move", target: sel.id, dx: r1(d.dx), dy: r1(d.dy) });
+  else renderAll();
+}
+function dropSelection() { endMove(); sel.id = null; }
+function deleteSelected() {
+  if (!sel.id) return;
+  endMove();
+  commit({ type: "remove", target: sel.id });
+  sel.id = null;
+  toast("Deleted. Undo brings it back.");
+}
+
+function outlineBox(c, b, dx, dy, selected) {
+  c.save();
+  c.setLineDash(selected ? [6, 5] : [3, 5]);
+  c.lineWidth = selected ? 1.5 : 1;
+  c.strokeStyle = selected ? theme.accent : withAlpha(theme.fg, 0.45);
+  c.strokeRect(b.x + dx - 6, b.y + dy - 6, b.w + 12, b.h + 12);
+  c.restore();
+}
+// The Delete button floats just above the selected item.
+let selBarAt = "";
+function placeSelBar(it, off) {
+  if (!it || sel.drag || state.tool !== "select") {
+    if (!el.selBar.hidden) { el.selBar.hidden = true; selBarAt = ""; }
+    return;
+  }
+  const [dx, dy] = off.get(it.id) || [0, 0], b = itemBounds(it);
+  const x = clamp(b.x + dx + b.w + 6 - 96, 8, W - 104);
+  let y = b.y + dy - 62;
+  if (y < 8) y = b.y + dy + b.h + 14;
+  const at = `${Math.round(x)},${Math.round(y)}`;
+  if (at === selBarAt) return;
+  if (el.selBar.hidden) el.selBar.dataset.armAt = performance.now() + 900;   // don't delete by landing on it
+  selBarAt = at;
+  el.selBar.style.left = `${Math.round(x)}px`;
+  el.selBar.style.top = `${Math.round(y)}px`;
+  el.selBar.hidden = false;
 }
 
 /* ---------- Input sources: mouse/touch + up to two hands ---------- */
@@ -467,15 +739,25 @@ const overlayOpen = () => !el.help.hidden || !el.intro.hidden;
 
 el.live.addEventListener("pointerdown", e => {
   if (state.mode === "intro" || e.button > 0) return;
+  const tool = TOOL[state.tool];
+  if (tool.kind === "text") { e.preventDefault(); textClick(e.clientX, e.clientY); return; }
+  if (tool.kind === "select") {
+    const hit = itemAt(e.clientX, e.clientY);
+    if (!hit) { sel.id = null; return; }
+    el.live.setPointerCapture(e.pointerId);
+    Object.assign(mouse, { down: true, visible: true, x: e.clientX, y: e.clientY });
+    beginMove("mouse", e.clientX, e.clientY, hit);
+    return;
+  }
   el.live.setPointerCapture(e.pointerId);
   Object.assign(mouse, { down: true, visible: true, x: e.clientX, y: e.clientY });
-  const tool = TOOL[state.tool];
   if (tool.kind === "shape") { mouse.anchor = [mouse.x, mouse.y]; mouse.shape = null; }
   else { beginStroke(mouse, mouse.x, mouse.y); mouse.drawing = true; }
 });
 el.live.addEventListener("pointermove", e => {
   Object.assign(mouse, { visible: true, x: e.clientX, y: e.clientY });
   if (!mouse.down) return;
+  if (sel.drag?.by === "mouse") { updateMove(mouse.x, mouse.y); return; }
   if (mouse.anchor) {
     mouse.shape = makeShape(TOOL[state.tool], mouse.anchor, [mouse.x, mouse.y]);
   } else if (mouse.stroke) {
@@ -486,6 +768,7 @@ el.live.addEventListener("pointermove", e => {
 function mouseUp() {
   if (!mouse.down) return;
   mouse.down = false;
+  if (sel.drag?.by === "mouse") { endMove(); return; }
   if (mouse.anchor) {
     if (mouse.shape && dist(mouse.shape.a, mouse.shape.b) > 4) commit(mouse.shape);
     mouse.shape = null; mouse.anchor = null;
@@ -528,8 +811,8 @@ function classify([i, m, r, p]) {
 
 function uiAt(x, y) {
   const node = document.elementFromPoint(clamp(x, 0, W - 1), clamp(y, 0, H - 1));
-  if (!node) return { zone: null, target: null };
-  return { zone: node.closest("[data-ui]"), target: node.closest("[data-act]") };
+  if (!node) return { node, zone: null, target: null };
+  return { node, zone: node.closest("[data-ui]"), target: node.closest("[data-act]") };
 }
 
 /* Pair this frame's detections with the hands we were already tracking. */
@@ -559,8 +842,10 @@ function assignHands(list) {
 
 function dropHand(h) {
   endStroke(h, 0);
+  if (camDrag?.by === h) endCamDrag();
+  if (sel.drag?.by === h) endMove();
   Object.assign(h, {
-    shape: null, stamp: null, stampLock: null, dwell: null, visible: false, drawing: false, overUI: false, pen: false,
+    shape: null, stamp: null, stampLock: null, dwell: null, visible: false, drawing: false, overUI: false, pen: false, textDown: false,
     pose: "none", rawPose: "none", cand: null, candN: 0, ext: [false, false, false, false],
     pinched: false, pinchRaw: false, pinchN: 0, prevPinched: false, needsFresh: false,
   });
@@ -605,12 +890,24 @@ function driveHand(h, now) {
   const pinchEdge = h.pinched && !h.prevPinched;
   h.prevPinched = h.pinched;
 
+  // Holding the camera preview: it follows the hand until the pinch opens.
+  if (camDrag?.by === h) {
+    if (h.pinched) { moveCamDrag(h.x, h.y); h.overUI = true; h.dwell = null; return; }
+    endCamDrag();
+  }
+
   const ui = uiAt(h.x, h.y);
   h.overUI = !!ui.zone;
   if (h.overUI) {
     endStroke(h, 0);
+    if (sel.drag?.by === h) endMove();
     h.shape = null; h.stamp = null; h.drawing = false; h.pen = false;
     h.needsFresh = true;   // leaving a toolbar mid-gesture shouldn't start a line
+    if (pinchEdge && ui.zone === el.cam && !ui.target && !camDrag) {   // pinch the preview to grab it
+      beginCamDrag(ui.node.closest(".cam-grip") ? "resize" : "move", h.x, h.y, h);
+      h.dwell = null;
+      return;
+    }
     if (pinchMode && pinchEdge && ui.target && !ui.target.disabled && now >= armedAt(ui.target)) {
       activate(ui.target, "hand");
       pulse(h.x, h.y, 14);
@@ -629,6 +926,29 @@ function driveHand(h, now) {
 
   if (practicing) {   // the practice games read h.pen every frame
     h.pen = go; h.drawing = go;
+    return;
+  }
+  if (tool.kind === "text") {   // pointing (or pinching) works like a click
+    endStroke(h, 0);
+    h.shape = null; h.stamp = null; h.stampLock = null; h.drawing = false;
+    if (go && !h.textDown) textClick(h.x, h.y);
+    h.textDown = go;
+    return;
+  }
+  if (tool.kind === "select") {   // point (or pinch) on something to grab it, lift to drop
+    endStroke(h, 0);
+    h.shape = null; h.stamp = null; h.stampLock = null;
+    const mine = sel.drag?.by === h;
+    if (go && !h.selDown && !sel.drag) {
+      const hit = itemAt(h.x, h.y);
+      if (hit) beginMove(h, h.x, h.y, hit); else sel.id = null;
+    } else if (go && mine) {
+      if (pinchMode ? h.pinchRaw : h.rawPose === "point") updateMove(h.x, h.y);   // ignore the finger curling away
+    } else if (!go && mine) {
+      endMove();
+    }
+    h.selDown = go;
+    h.drawing = sel.drag?.by === h;
     return;
   }
   if (tool.kind === "shape") {
@@ -707,13 +1027,20 @@ function syncHover() {
 /* ---------- Actions (shared by click, hand and keyboard) ---------- */
 const ACTIONS = {
   tool: a => { endAllStrokes(); state.tool = a; syncUI(); },
-  color: a => { state.color = a; syncUI(); },
-  size: a => { state.sizeIdx = Number(a); syncUI(); },
+  color: a => { state.color = a; syncUI(); keepTyping(); },
+  size: a => { state.sizeIdx = Number(a); syncUI(); keepTyping(); },
+  "text-done": textCommit,
+  "text-cancel": textCancel,
+  "sel-delete": deleteSelected,
   undo, redo,
   clear: clearBoard,
-  board: () => { state.board = state.board === "black" ? "white" : "black"; syncUI(); renderAll(); },
+  board: () => { textCommit(); state.board = state.board === "black" ? "white" : "black"; syncUI(); renderAll(); },
   save: savePng,
   cam: () => { state.camVisible = !state.camVisible; syncUI(); },
+  camera: () => {
+    if (camStarting) return;
+    if (state.camOn) stopCamera(); else startCamera();
+  },
   ghost: () => {
     state.ghost = !state.ghost;
     if (!state.ghost) ctx.ghost.clearRect(0, 0, el.ghost.width, el.ghost.height);
@@ -752,6 +1079,12 @@ document.addEventListener("click", e => {
 });
 
 addEventListener("keydown", e => {
+  // Typing in a text box: Enter finishes, Shift+Enter adds a line, Esc cancels.
+  if (e.target.closest?.("#text-edit")) {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); textCommit(); }
+    else if (e.key === "Escape") { e.preventDefault(); textCancel(); }
+    return;
+  }
   const k = e.key.toLowerCase(), mod = e.metaKey || e.ctrlKey;
   const practicing = state.view === "practice";
   if (mod && !practicing) {
@@ -764,9 +1097,11 @@ addEventListener("keydown", e => {
     if (!el.help.hidden) el.help.hidden = true;
     else if (practicing && (P.active || !el.pResult.hidden)) showMenu();
     else if (practicing) practiceExit();
+    else if (sel.id) dropSelection();
     return;
   }
   if (!el.intro.hidden) return;
+  if ((e.key === "Delete" || e.key === "Backspace") && sel.id && !practicing) { e.preventDefault(); deleteSelected(); return; }
   if (e.key === "?") { el.help.hidden ? ACTIONS.help() : ACTIONS["help-close"](); return; }
   if (practicing) return;
   if (k === "p") return ACTIONS.practice();
@@ -809,8 +1144,18 @@ function setStatus(kind, title, hint = "") {
 }
 function toolHint() {
   const t = TOOL[state.tool];
+  if (t.kind === "select") {
+    if (mouseOnly()) return "Drag text, shapes or drawings to move them. Press Delete to remove the selected one.";
+    return state.drawWith === "pinch"
+      ? "Pinch something to grab it, move, then open your fingers to drop it."
+      : "Point at something to grab it, move, then raise two fingers to drop it.";
+  }
+  if (t.kind === "text") {
+    const how = mouseOnly() ? "Click" : state.drawWith === "pinch" ? "Pinch" : "Point";
+    return `${how} where the text goes, type, then press Enter. ${how} on text to edit it.`;
+  }
   const verb = t.id === "eraser" ? "erase" : "draw";
-  if (state.mode === "mouse") return t.kind === "shape" ? `Drag to draw a ${t.label.toLowerCase()}.` : `Drag to ${verb}.`;
+  if (mouseOnly()) return t.kind === "shape" ? `Drag to draw a ${t.label.toLowerCase()}.` : `Drag to ${verb}.`;
   if (t.kind === "shape") return "Point, then spread thumb and index to size. Hold still to place.";
   return state.drawWith === "pinch"
     ? `Pinch to ${verb}. Open your fingers to move.`
@@ -824,11 +1169,12 @@ function updateStatus() {
     if (key === statusKey) return;
     statusKey = key;
     setStatus(n ? "tracking" : "waiting", n ? `Tracking ${n} hand${n > 1 ? "s" : ""}` : "Show your hand to the camera", toolHint());
-  } else if (state.mode === "mouse") {
-    const key = `m${state.tool}`;
+  } else if (mouseOnly()) {
+    const off = state.mode === "camera";
+    const key = `${off ? "off" : "m"}${state.tool}`;
     if (key === statusKey) return;
     statusKey = key;
-    setStatus("idle", "Mouse mode", toolHint());
+    setStatus("idle", off ? "Camera off" : "Mouse mode", off ? `Hand tracking is paused. ${toolHint()}` : toolHint());
   }
 }
 let toastTimer;
@@ -866,21 +1212,30 @@ function fallBackToMouse(title, hint) {
   syncUI();
 }
 
+let camStream = null, camStarting = false;
+
 async function startCamera() {
+  if (camStarting || state.camOn) return;
+  camStarting = true;
+  try { await openCamera(); }
+  finally { camStarting = false; statusKey = ""; syncUI(); }
+}
+
+async function openCamera() {
   el.intro.hidden = true;
   state.mode = "camera";
+  statusLocked = false;
   syncUI();
   if (!navigator.mediaDevices?.getUserMedia) {
     fallBackToMouse("Camera unavailable", "Open this page through a local server (http://localhost) or over https.");
     return;
   }
   setStatus("loading", "Starting camera", "Allow camera access when your browser asks.");
-  const model = createLandmarker();
+  const model = landmarker ? Promise.resolve(landmarker) : createLandmarker();
   model.catch(() => {});   // handled below; avoids an unhandled-rejection warning meanwhile
 
-  let stream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
+    camStream = await navigator.mediaDevices.getUserMedia({
       video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }, audio: false,
     });
   } catch (err) {
@@ -891,23 +1246,89 @@ async function startCamera() {
     fallBackToMouse("Camera unavailable", why);
     return;
   }
-  el.video.srcObject = stream;
+  el.video.srcObject = camStream;
   try { await el.video.play(); } catch { /* autoplay+muted normally succeeds */ }
   if (!el.video.videoWidth) await new Promise(r => el.video.addEventListener("loadedmetadata", r, { once: true }));
   VW = el.video.videoWidth || 1280; VH = el.video.videoHeight || 720;
   el.camView.style.aspectRatio = `${VW} / ${VH}`;
 
-  setStatus("loading", "Loading hand tracking", "Downloading the hand model. This takes a few seconds the first time.");
+  if (!landmarker) setStatus("loading", "Loading hand tracking", "Downloading the hand model. This takes a few seconds the first time.");
   try {
     landmarker = await model;
   } catch (err) {
     console.error(err);
-    stream.getTracks().forEach(t => t.stop());
+    stopTracks();
     fallBackToMouse("Hand tracking didn't load", "Check your internet connection and reload.");
     return;
   }
+  state.camOn = true;
+}
+
+function stopTracks() {
+  camStream?.getTracks().forEach(t => t.stop());
+  camStream = null;
+  el.video.srcObject = null;
+}
+
+// Stops the webcam itself (its light goes off), not just the preview.
+function stopCamera() {
+  if (!state.camOn) return;
+  stopTracks();
+  state.camOn = false;
+  lastVideoTime = -1;
+  for (const h of hands) dropHand(h);
+  ctx.ghost.clearRect(0, 0, el.ghost.width, el.ghost.height);
+  el.camOverlay.width = el.camOverlay.width;   // clears the hand overlay
   statusKey = "";
   syncUI();
+  toast("Camera off. Turn it back on with the Camera button.");
+}
+
+/* ---------- Camera preview: drag to move, drag the corner to resize ---------- */
+const CAM_MIN_W = 160;
+let camDrag = null;   // { kind: "move" | "resize", by: "mouse" | hand, sx, sy, start }
+
+function camBox() {
+  const w = clamp(state.camBox?.w ?? 232, CAM_MIN_W, Math.max(CAM_MIN_W, Math.min(860, W - 32)));
+  return { x: state.camBox?.x ?? W - 16 - w, y: state.camBox?.y ?? 104, w };
+}
+// Size and position the preview, keeping it on screen.
+function placeCam() {
+  const b = camBox();
+  el.cam.style.width = `${b.w}px`;
+  b.x = clamp(b.x, 8, Math.max(8, W - b.w - 8));
+  b.y = clamp(b.y, 8, Math.max(8, H - el.cam.offsetHeight - 8));
+  el.cam.style.left = `${b.x}px`;
+  el.cam.style.top = `${b.y}px`;
+  return b;
+}
+function beginCamDrag(kind, x, y, by) {
+  camDrag = { kind, by, sx: x, sy: y, start: placeCam() };
+  el.cam.classList.add("dragging");
+}
+function moveCamDrag(x, y) {
+  const { kind, sx, sy, start } = camDrag, dx = x - sx, dy = y - sy;
+  state.camBox = kind === "move"
+    ? { ...start, x: start.x + dx, y: start.y + dy }
+    : { ...start, w: start.w + Math.max(dx, dy * VW / VH) };   // the corner follows whichever way you pull further
+  placeCam();
+}
+function endCamDrag() {
+  if (!camDrag) return;
+  camDrag = null;
+  el.cam.classList.remove("dragging");
+  state.camBox = placeCam();
+  saveSettings();
+}
+el.cam.addEventListener("pointerdown", e => {
+  if (e.button > 0 || e.target.closest("[data-act]")) return;
+  e.preventDefault();
+  el.cam.setPointerCapture(e.pointerId);
+  beginCamDrag(e.target.closest(".cam-grip") ? "resize" : "move", e.clientX, e.clientY, "mouse");
+});
+el.cam.addEventListener("pointermove", e => { if (camDrag?.by === "mouse") moveCamDrag(e.clientX, e.clientY); });
+for (const type of ["pointerup", "pointercancel"]) {
+  el.cam.addEventListener(type, () => { if (camDrag?.by === "mouse") endCamDrag(); });
 }
 
 function startMouse() {
@@ -926,6 +1347,7 @@ function resize() {
     c.setTransform(DPR, 0, 0, DPR, 0, 0);
   }
   el.ghost.width = Math.round(W / 2); el.ghost.height = Math.round(H / 2);
+  placeCam();
   renderAll();
   if (state.view === "practice" && P.active && !P.finished) P.active.resize?.();
 }
@@ -937,6 +1359,25 @@ function renderLive() {
     if (s.stroke && s.stroke.tool !== "eraser") drawItem(c, s.stroke);
     if (s.shape) { c.save(); c.globalAlpha = 0.7; drawItem(c, s.shape); c.restore(); }
   }
+  // Selection: the item being moved, its box, and a faint box on whatever the cursor is over.
+  const selected = sel.id ? findItem(sel.id) : null;
+  if (sel.id && !selected) sel.id = null;
+  const off = selected || state.tool === "select" ? offsets() : null;
+  if (selected) {
+    const [ox, oy] = off.get(selected.id) || [0, 0];
+    const dx = ox + (sel.drag?.dx || 0), dy = oy + (sel.drag?.dy || 0);
+    if (sel.drag) { c.save(); c.translate(dx, dy); drawItem(c, selected); c.restore(); }
+    outlineBox(c, itemBounds(selected), dx, dy, true);
+  }
+  for (const s of allSources()) {
+    s.hover = null;
+    if (state.tool !== "select" || sel.drag || !s.visible || s.overUI) continue;
+    const hit = itemAt(s.x, s.y);
+    if (!hit) continue;
+    s.hover = hit.it.id;
+    if (hit.it.id !== sel.id) outlineBox(c, itemBounds(hit.it), hit.dx, hit.dy, false);
+  }
+  placeSelBar(selected, off);
 }
 
 const pulses = [];
@@ -948,7 +1389,8 @@ function renderCursors(now) {
   const tool = TOOL[state.tool];
   for (const s of allSources()) {
     if (!s.visible) continue;
-    if (state.view === "board" && s.kind === "hand" && tool.kind === "shape" && !s.overUI && s.pose === "point" && !s.needsFresh) drawShapeCursor(c, s);
+    if (state.view === "board" && tool.kind === "select" && !s.overUI) drawPointerCursor(c, s);
+    else if (state.view === "board" && s.kind === "hand" && tool.kind === "shape" && !s.overUI && s.pose === "point" && !s.needsFresh) drawShapeCursor(c, s);
     else drawRingCursor(c, s, tool);
   }
   for (let i = pulses.length - 1; i >= 0; i--) {
@@ -959,12 +1401,32 @@ function renderCursors(now) {
   }
 }
 
+// Select tool: an arrow pointer whose tip is the fingertip, with a glow when it's over something it can grab.
+function drawPointerCursor(c, s) {
+  const paused = s.kind === "hand" && state.drawWith === "point" && s.pose === "fist";
+  const grabbing = !!sel.drag && sel.drag.by === (s.kind === "mouse" ? "mouse" : s);
+  c.save();
+  c.translate(s.x, s.y);
+  c.globalAlpha = paused ? 0.45 : 1;
+  if (s.hover || grabbing) {
+    c.beginPath(); c.arc(0, 0, 13, 0, TAU);
+    c.fillStyle = withAlpha(theme.accent, grabbing ? 0.32 : 0.18); c.fill();
+  }
+  c.beginPath();
+  c.moveTo(0, 0); c.lineTo(0, 17); c.lineTo(4.5, 13); c.lineTo(7.5, 19.5);
+  c.lineTo(10, 18.4); c.lineTo(7, 12); c.lineTo(12.5, 12); c.closePath();
+  c.fillStyle = theme.fg; c.fill();
+  c.lineJoin = "round"; c.lineWidth = 1.5; c.strokeStyle = theme.board; c.stroke();
+  c.restore();
+}
+
 // The cursor: a soft, nearly transparent disc sized to the tool.
 function drawRingCursor(c, s, tool) {
   const practicing = state.view === "practice";
   const erasing = tool.id === "eraser" && !practicing;
+  const texting = tool.kind === "text" && !practicing && !s.overUI;
   const paused = s.kind === "hand" && state.drawWith === "point" && s.pose === "fist" && !s.overUI;
-  let r = s.overUI ? 13 : practicing ? 12 : erasing ? Math.max(10, toolWidth(tool) / 2) : Math.max(11, toolWidth(tool) / 2 + 5);
+  let r = s.overUI ? 13 : practicing ? 12 : texting ? 14 : erasing ? Math.max(10, toolWidth(tool) / 2) : Math.max(11, toolWidth(tool) / 2 + 5);
   if (paused) r = 8;
   const tint = s.overUI || erasing || practicing ? theme.fg : colorOf(state.color);
   c.save();
@@ -975,7 +1437,13 @@ function drawRingCursor(c, s, tool) {
   c.strokeStyle = s.overUI ? theme.accent : withAlpha(theme.fg, s.drawing ? 0.85 : 0.5);
   if (erasing && !s.overUI) c.setLineDash([4, 4]);
   c.stroke(); c.setLineDash([]);
-  if (s.drawing || s.kind === "mouse") {
+  if (texting && !paused) {   // a text caret
+    c.beginPath();
+    c.moveTo(s.x, s.y - 7); c.lineTo(s.x, s.y + 7);
+    c.moveTo(s.x - 3, s.y - 7); c.lineTo(s.x + 3, s.y - 7);
+    c.moveTo(s.x - 3, s.y + 7); c.lineTo(s.x + 3, s.y + 7);
+    c.lineWidth = 1.5; c.strokeStyle = withAlpha(theme.fg, 0.9); c.stroke();
+  } else if (s.drawing || s.kind === "mouse") {
     c.beginPath(); c.arc(s.x, s.y, 1.8, 0, TAU); c.fillStyle = withAlpha(theme.fg, 0.9); c.fill();
   }
   const p = s.dwell?.progress || 0;
@@ -1153,7 +1621,7 @@ function label(c, text, x, y, color = theme.fg) {
 function setHud(t) { if (t !== P.hud) { P.hud = t; el.pHud.textContent = t; } }
 function setHint(t) { if (t !== P.hint) { P.hint = t; el.pHint.textContent = t; el.pHint.hidden = !t; } }
 function penHint(verb) {
-  if (state.mode === "mouse") return `Hold the mouse button to ${verb}.`;
+  if (mouseOnly()) return `Hold the mouse button to ${verb}.`;
   return state.drawWith === "pinch" ? `Pinch to ${verb}.` : `Point your index finger to ${verb}, two fingers up to stop.`;
 }
 
@@ -1356,7 +1824,7 @@ function popActivity() {
     title: "Bubble pop",
     start(now) {
       spawn(now, true);
-      setHint(`Hold the cursor inside each bubble until it pops.${state.mode === "camera" ? " Make a fist to rest." : ""}`);
+      setHint(`Hold the cursor inside each bubble until it pops.${camReady() ? " Make a fist to rest." : ""}`);
     },
     resize() {
       A = playArea();
@@ -1724,9 +2192,9 @@ function practicePointers() {
 function practiceTick(now) {
   const dt = clamp(now - (P.last || now), 0, 50);
   P.last = now;
-  const track = state.mode === "mouse" ? "Mouse mode"
-    : !camReady() ? "Camera starting"
-    : hands.some(h => h.visible) ? "Hand found" : "Show your hand";
+  const track = camReady() ? (hands.some(h => h.visible) ? "Hand found" : "Show your hand")
+    : camStarting ? "Camera starting"
+    : state.mode === "camera" && landmarker ? "Camera off" : "Mouse mode";
   if (track !== P.track) {
     P.track = track;
     el.pTrackText.textContent = track;
@@ -1781,9 +2249,14 @@ function makeGrain() {
   document.documentElement.style.setProperty("--grain", `url(${c.toDataURL()})`);
 }
 
+// Drawings saved before the Select tool existed need ids so they can be moved.
+for (const it of state.items) if (!it.id && (it.type === "stroke" || it.type === "shape")) it.id = newId();
+
 buildUI();
 makeGrain();
 syncUI();
 resize();
+// Canvas text only uses Kalam once it has loaded, so redraw saved text when it arrives.
+document.fonts?.load(textFont(28)).then(() => { if (state.items.some(it => it.type === "text")) renderAll(); }).catch(() => {});
 addEventListener("resize", resize);
 requestAnimationFrame(frame);
