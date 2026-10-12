@@ -7,7 +7,7 @@ HandBoard is an interactive website that allows users to draw with their hand mo
 Included is a simple whiteboard with shapes and different colour brushes. There is an activities section for strengthening those skills as stated. These include following the line, popping bubbles and tracing shapes.
 
 Here is the website link: https://handboard-web.vercel.app/
-Alternatively, you can download the source yourself and run it locally, using:
+Alternatively, you can download the source yourself and run it locally, while in the handboard directory, using:
           
 ```python3 -m http.server XXXX``` 
 
