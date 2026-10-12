@@ -12,3 +12,6 @@ Alternatively, you can download the source yourself and run it locally, while in
 ```python3 -m http.server XXXX``` 
 
 where XXXX is a port number of your choosing, e.g. 8000
+
+
+HandBoard uses plain HTML, CSS, JS and external libraries, mainly **Google's Hand Landmarker model**, run through **MediaPipe Tasks Vision**, which reports 21 points per hand on each video frame. (https://developers.google.com/edge/mediapipe/solutions/vision/hand_landmarker)
